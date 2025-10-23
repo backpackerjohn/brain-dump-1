@@ -7,78 +7,124 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Cosine similarity helpers for simple clustering on small N
-function dot(a: number[], b: number[]) {
-  let s = 0;
-  const n = Math.min(a.length, b.length);
-  for (let i = 0; i < n; i++) s += a[i] * b[i];
-  return s;
+interface ThoughtInput {
+  id: string;
+  text: string;
 }
 
-function norm(a: number[]) {
-  let s = 0;
-  for (const v of a) s += v * v;
-  return Math.sqrt(s);
+interface ClusterResult {
+  clusterName: string;
+  thoughtIds: string[];
 }
 
-function cosineSim(a: number[], b: number[]) {
-  const d = norm(a) * norm(b);
-  if (d === 0) return 0;
-  return dot(a, b) / d;
-}
+/**
+ * Process a chunk of thoughts using Gemini AI for semantic clustering
+ */
+async function processChunkWithAI(
+  thoughts: ThoughtInput[], 
+  existingClusters: string[],
+  apiKey: string
+): Promise<ClusterResult[]> {
+  
+  const prompt = `You are an expert personal assistant specializing in organizing information. Your task is to analyze a list of a user's raw, unstructured thoughts and group them into meaningful, thematic clusters.
 
-function parseVector(v: unknown): number[] | null {
-  if (Array.isArray(v)) return v as number[];
-  if (typeof v === 'string') {
-    try {
-      const parsed = JSON.parse(v);
-      if (Array.isArray(parsed)) return parsed as number[];
-    } catch (_) {
-      // not JSON; PostgREST may serialize vectors as strings like "[0.1,0.2]"
-      if (v.startsWith('[') && v.endsWith(']')) {
-        try {
-          const parsed2 = JSON.parse(v);
-          if (Array.isArray(parsed2)) return parsed2 as number[];
-        } catch {}
-      }
-    }
-  }
-  return null;
-}
+**Instructions:**
+1. **Analyze Holistically:** Read through all the provided thoughts to understand the main themes present.
+2. **Form Clusters:** Group thoughts that are clearly related by project, topic, goal, or context.
+3. **Name Clusters Concisely:** Create a short, descriptive name for each cluster (3-5 words max). The name should represent the core theme of the thoughts within it.
+4. **Be Discerning:** It is better to leave a thought unclustered than to force it into an irrelevant group. Do not create a "Miscellaneous" or "General" cluster. Only cluster thoughts that have strong thematic connections.
+5. **Output Format:** You MUST provide your answer in the JSON format specified in the schema.
 
-function clusterByThreshold(ids: string[], vectors: number[][], threshold = 0.75): string[][] {
-  const n = vectors.length;
-  if (n < 2) return [];
-  const adj: number[][] = Array.from({ length: n }, () => []);
-  for (let i = 0; i < n; i++) {
-    for (let j = i + 1; j < n; j++) {
-      if (cosineSim(vectors[i], vectors[j]) >= threshold) {
-        adj[i].push(j);
-        adj[j].push(i);
-      }
-    }
-  }
-  const visited = new Array(n).fill(false);
-  const clusters: string[][] = [];
-  for (let i = 0; i < n; i++) {
-    if (visited[i]) continue;
-    const stack = [i];
-    visited[i] = true;
-    const groupIdx: number[] = [];
-    while (stack.length) {
-      const cur = stack.pop()!;
-      groupIdx.push(cur);
-      for (const nb of adj[cur]) {
-        if (!visited[nb]) {
-          visited[nb] = true;
-          stack.push(nb);
+${existingClusters.length > 0 ? `**Existing Clusters:**
+The following cluster names already exist. Try to add thoughts to these clusters if they fit before creating new ones:
+${existingClusters.map(name => `- ${name}`).join('\n')}
+` : ''}
+
+**Input Thoughts:**
+${JSON.stringify(thoughts, null, 2)}`;
+
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.0-flash-exp',
+      messages: [{ role: 'user', content: prompt }],
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'cluster_response',
+          strict: true,
+          schema: {
+            type: 'object',
+            properties: {
+              clusters: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    clusterName: {
+                      type: 'string',
+                      description: 'A concise, descriptive name for the theme of the cluster (3-5 words max)'
+                    },
+                    thoughtIds: {
+                      type: 'array',
+                      items: { type: 'string' },
+                      description: 'An array of the original thought IDs that belong in this cluster'
+                    }
+                  },
+                  required: ['clusterName', 'thoughtIds'],
+                  additionalProperties: false
+                }
+              }
+            },
+            required: ['clusters'],
+            additionalProperties: false
+          }
         }
       }
-    }
-    if (groupIdx.length >= 2) clusters.push(groupIdx.map((k) => ids[k]));
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => 'Unknown error');
+    console.error('Gemini API error:', response.status, errorText);
+    throw new Error(`AI clustering failed: ${response.status} - ${errorText}`);
   }
-  return clusters;
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content;
+  
+  if (!content) {
+    console.error('No content in Gemini response:', data);
+    return [];
+  }
+
+  // Parse the response - it might be a string or already parsed
+  let clusters: ClusterResult[] = [];
+  if (typeof content === 'string') {
+    try {
+      const parsed = JSON.parse(content);
+      clusters = parsed.clusters || [];
+    } catch (e) {
+      console.error('Failed to parse Gemini response:', content);
+      return [];
+    }
+  } else if (content?.clusters) {
+    clusters = content.clusters;
+  }
+
+  // Validate and filter clusters
+  return clusters.filter(c => 
+    c.clusterName && 
+    c.thoughtIds && 
+    Array.isArray(c.thoughtIds) && 
+    c.thoughtIds.length >= 2 // Only keep clusters with 2+ thoughts
+  );
 }
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -105,21 +151,14 @@ serve(async (req) => {
 
     console.log('Fetching active thoughts for user:', user.id);
 
-    // Fetch all active thoughts with their categories and existing embeddings
+    // Fetch all active thoughts
     const { data: thoughtsRaw, error: fetchError } = await supabase
       .from('thoughts')
       .select(`
         id,
         title,
         snippet,
-        content,
-        embedding,
-        thought_categories(
-          categories(
-            id,
-            name
-          )
-        )
+        content
       `)
       .eq('user_id', user.id)
       .eq('status', 'active');
@@ -137,256 +176,173 @@ serve(async (req) => {
         .from('thought_clusters')
         .select('thought_id')
         .in('thought_id', ids);
+      
       if (linksError) {
         console.error('Error fetching existing cluster links:', linksError);
         throw linksError;
       }
+      
       const linked = new Set((links || []).map((l: any) => l.thought_id));
       thoughts = thoughts.filter((t: any) => !linked.has(t.id));
     }
 
-    if (!thoughts || thoughts.length === 0) {
-      console.log('No unclustered thoughts found');
+    console.log(`Found ${thoughts.length} unclustered thoughts`);
+
+    // RULE #1: Threshold Trigger - Need at least 10 thoughts
+    if (thoughts.length < 10) {
+      console.log('Not enough thoughts for clustering');
       return new Response(
-        JSON.stringify({ clusters: [], message: 'No thoughts available for clustering' }),
+        JSON.stringify({ 
+          clusters: [], 
+          message: `Need at least 10 unclustered thoughts to generate clusters. You currently have ${thoughts.length}.` 
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`Found ${thoughts.length} unclustered thoughts`);
-
-    // Ensure embeddings exist (lazy-embed if missing)
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    const EMBEDDING_MODEL = 'google/text-embedding-004';
-
-    const localVectors = new Map<string, number[]>();
-    const toEmbed: { id: string; text: string }[] = [];
-    for (const t of thoughts) {
-      const v = parseVector(t.embedding);
-      if (v && v.length > 0) {
-        localVectors.set(t.id, v);
-      } else {
-        const text = (t.content ?? t.snippet ?? t.title ?? '').toString();
-        if (text.trim().length > 0) toEmbed.push({ id: t.id, text });
-      }
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY not configured');
     }
 
-    if (toEmbed.length > 0 && LOVABLE_API_KEY) {
-      try {
-        console.log(`Embedding ${toEmbed.length} thoughts...`);
-        const embedResp = await fetch('https://ai.gateway.lovable.dev/v1/embeddings', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ model: EMBEDDING_MODEL, input: toEmbed.map((x) => x.text) })
-        });
-        let embedData: any = null;
-        if (!embedResp.ok) {
-          const errText = await embedResp.text().catch(() => '');
-          console.error('Embedding API error (primary model):', EMBEDDING_MODEL, embedResp.status, errText);
-          // Try an alternate model once
-          const ALT_MODEL = 'google/text-embedding-005';
-          const altResp = await fetch('https://ai.gateway.lovable.dev/v1/embeddings', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ model: ALT_MODEL, input: toEmbed.map((x) => x.text) })
-          });
-          if (!altResp.ok) {
-            const altErr = await altResp.text().catch(() => '');
-            console.error('Embedding API error (alternate model):', ALT_MODEL, altResp.status, altErr);
-            throw new Error(`Embedding request failed (primary ${embedResp.status}, alt ${altResp.status})`);
-          }
-          embedData = await altResp.json();
-        } else {
-          embedData = await embedResp.json();
-        }
-        const items = Array.isArray(embedData.data) ? embedData.data : [];
-        if (items.length !== toEmbed.length) {
-          console.warn('Embedding response length mismatch');
-        }
-        for (let i = 0; i < toEmbed.length; i++) {
-          const id = toEmbed[i].id;
-          const emb = items[i]?.embedding;
-          if (Array.isArray(emb)) {
-            localVectors.set(id, emb as number[]);
-            // Mark success without persisting vector to avoid pgvector serialization issues
-            await supabase
-              .from('thoughts')
-              .update({
-                embedding_failed: false,
-                last_embedding_attempt: new Date().toISOString(),
-              })
-              .eq('id', id);
-          } else {
-            await supabase
-              .from('thoughts')
-              .update({
-                embedding_failed: true,
-                last_embedding_attempt: new Date().toISOString(),
-              })
-              .eq('id', id);
-          }
-        }
-      } catch (e) {
-        console.error('Embedding step failed, falling back to categories:', e);
-      }
+    // Prepare thoughts for AI processing
+    const thoughtInputs: ThoughtInput[] = thoughts.map((t: any) => ({
+      id: t.id,
+      text: `${t.title}: ${t.content || t.snippet || ''}`
+    }));
+
+    // RULE #2: Chunking Protocol for scalability
+    const CHUNK_SIZE = 200;
+    const chunks: ThoughtInput[][] = [];
+    
+    for (let i = 0; i < thoughtInputs.length; i += CHUNK_SIZE) {
+      chunks.push(thoughtInputs.slice(i, i + CHUNK_SIZE));
     }
 
-    // Build clusters
-    const idList: string[] = [];
-    const vecList: number[][] = [];
-    for (const t of thoughts) {
-      const v = localVectors.get(t.id);
-      if (v) {
-        idList.push(t.id);
-        vecList.push(v);
-      }
+    console.log(`Processing ${thoughtInputs.length} thoughts in ${chunks.length} chunk(s)`);
+
+    let existingClusterNames: string[] = [];
+    const allClustersToCreate: ClusterResult[] = [];
+
+    // Process each chunk sequentially
+    for (let i = 0; i < chunks.length; i++) {
+      console.log(`Processing chunk ${i + 1}/${chunks.length} (${chunks[i].length} thoughts)`);
+      
+      const clustersFromChunk = await processChunkWithAI(
+        chunks[i], 
+        existingClusterNames,
+        LOVABLE_API_KEY
+      );
+      
+      console.log(`Chunk ${i + 1} produced ${clustersFromChunk.length} cluster(s)`);
+      allClustersToCreate.push(...clustersFromChunk);
+      
+      // Update existing cluster names for next iteration
+      existingClusterNames = allClustersToCreate.map(c => c.clusterName);
     }
 
-    const clustersToCreate: { name: string; thoughtIds: string[] }[] = [];
-    if (vecList.length >= 2) {
-      // Embedding-based grouping using connected components at similarity threshold
-      const groups = clusterByThreshold(idList, vecList, 0.75);
-      console.log(`Embedding clustering produced ${groups.length} group(s)`);
-      for (const group of groups) {
-        // Generate a name using thought titles
-        let clusterName = 'Related Ideas';
-        if (LOVABLE_API_KEY) {
-          try {
-            const titles = thoughts
-              .filter((t: any) => group.includes(t.id))
-              .map((t: any) => t.title)
-              .join('\n');
-            const namePrompt = `Given these related thoughts, create a concise, descriptive cluster name (2-4 words):\n\n${titles}\n\nRespond with ONLY the cluster name, nothing else.`;
-            const nameResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                model: 'google/gemini-2.5-flash',
-                messages: [{ role: 'user', content: namePrompt }],
-                max_tokens: 20
-              }),
-            });
-            if (nameResponse.ok) {
-              const nameData = await nameResponse.json();
-              const generatedName = nameData.choices?.[0]?.message?.content?.trim();
-              if (generatedName) clusterName = generatedName;
-            }
-          } catch (err) {
-            console.error('Error generating cluster name:', err);
-          }
-        }
-        clustersToCreate.push({ name: clusterName, thoughtIds: group });
-      }
-    }
+    console.log(`Total clusters to create: ${allClustersToCreate.length}`);
 
-    // Fallback: category grouping if no embedding clusters
-    if (clustersToCreate.length === 0) {
-      const categoryMap = new Map<string, any[]>();
-      for (const thought of thoughts) {
-        const categories = thought.thought_categories?.map((tc: any) => tc.categories.name) || [];
-        const categoryKey = categories.sort().join('|') || 'Uncategorized';
-        if (!categoryMap.has(categoryKey)) categoryMap.set(categoryKey, []);
-        categoryMap.get(categoryKey)!.push({ id: thought.id, title: thought.title });
-      }
-      for (const [categoryKey, thoughtGroup] of categoryMap.entries()) {
-        if (thoughtGroup.length < 2) continue;
-        let clusterName = categoryKey === 'Uncategorized' ? 'Miscellaneous' : categoryKey.split('|').join(', ');
-        if (LOVABLE_API_KEY) {
-          try {
-            const thoughtTitles = thoughtGroup.map((t: any) => t.title).join('\n');
-            const namePrompt = `Given these related thoughts, create a concise, descriptive cluster name (2-4 words):\n\n${thoughtTitles}\n\nRespond with ONLY the cluster name, nothing else.`;
-            const nameResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                model: 'google/gemini-2.5-flash',
-                messages: [{ role: 'user', content: namePrompt }],
-                max_tokens: 20
-              }),
-            });
-            if (nameResponse.ok) {
-              const nameData = await nameResponse.json();
-              const generatedName = nameData.choices?.[0]?.message?.content?.trim();
-              if (generatedName) clusterName = generatedName;
-            }
-          } catch (error) {
-            console.error('Error generating cluster name:', error);
-          }
-        }
-        clustersToCreate.push({
-          name: clusterName,
-          thoughtIds: thoughtGroup.map((t: any) => t.id)
-        });
-      }
+    if (allClustersToCreate.length === 0) {
+      return new Response(
+        JSON.stringify({ 
+          clusters: [], 
+          message: 'No strong thematic connections found among your thoughts. Try adding more thoughts or wait until you have more diverse content.' 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
-
-    console.log(`Creating ${clustersToCreate.length} clusters`);
 
     // Insert clusters and link thoughts
     const createdClusters = [];
     
-    for (const cluster of clustersToCreate) {
-      const { data: newCluster, error: clusterError } = await supabase
+    for (const cluster of allClustersToCreate) {
+      // Check if a cluster with this name already exists (from previous chunks)
+      const { data: existingCluster, error: checkError } = await supabase
         .from('clusters')
-        .insert({
-          user_id: user.id,
-          name: cluster.name
-        })
-        .select()
-        .single();
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('name', cluster.clusterName)
+        .maybeSingle();
 
-      if (clusterError) {
-        console.error('Error creating cluster:', clusterError);
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('Error checking for existing cluster:', checkError);
         continue;
       }
 
-      // Link thoughts to cluster
+      let clusterId: string;
+
+      if (existingCluster) {
+        // Add to existing cluster
+        clusterId = existingCluster.id;
+        console.log(`Adding thoughts to existing cluster: ${cluster.clusterName}`);
+      } else {
+        // Create new cluster
+        const { data: newCluster, error: clusterError } = await supabase
+          .from('clusters')
+          .insert({
+            user_id: user.id,
+            name: cluster.clusterName,
+            is_manual: false
+          })
+          .select()
+          .single();
+
+        if (clusterError) {
+          console.error('Error creating cluster:', clusterError);
+          continue;
+        }
+
+        clusterId = newCluster.id;
+        createdClusters.push(newCluster);
+      }
+
+      // Link thoughts to cluster (avoid duplicates)
       const thoughtClusterLinks = cluster.thoughtIds.map(thoughtId => ({
         thought_id: thoughtId,
-        cluster_id: newCluster.id
+        cluster_id: clusterId
       }));
 
+      // Use upsert to avoid conflicts
       const { error: linkError } = await supabase
         .from('thought_clusters')
-        .insert(thoughtClusterLinks);
+        .upsert(thoughtClusterLinks, {
+          onConflict: 'thought_id,cluster_id',
+          ignoreDuplicates: true
+        });
 
       if (linkError) {
         console.error('Error linking thoughts to cluster:', linkError);
-      } else {
-        createdClusters.push(newCluster);
       }
     }
 
-    console.log(`Successfully created ${createdClusters.length} clusters`);
+    console.log(`Successfully created ${createdClusters.length} new clusters`);
 
     return new Response(
-      JSON.stringify({ clusters: createdClusters }),
+      JSON.stringify({ 
+        clusters: createdClusters,
+        message: `Successfully organized your thoughts into ${createdClusters.length} cluster${createdClusters.length !== 1 ? 's' : ''}.`
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
     console.error('=== Error Generating Clusters ===');
     console.error('Error:', error instanceof Error ? error.message : String(error));
+    console.error('Stack:', error instanceof Error ? error.stack : '');
+    
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     const isAuth = errorMessage.includes('authenticated') || errorMessage.includes('authorization');
-    const payload = { error: errorMessage };
-    // Preserve 401 for auth errors; otherwise return 200 with error payload so UI doesn't get a generic non-2xx
-    const status = isAuth ? 401 : 200;
+    
     return new Response(
-      JSON.stringify(payload),
-      { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        error: errorMessage,
+        clusters: []
+      }),
+      { 
+        status: isAuth ? 401 : 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   }
 });

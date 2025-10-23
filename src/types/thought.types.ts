@@ -29,7 +29,10 @@ export interface ThoughtWithCategories extends Thought {
 export interface Cluster {
   id: string;
   name: string;
+  is_manual?: boolean;
+  is_collapsed?: boolean;
   created_at: string;
+  updated_at?: string;
   thought_clusters?: Array<{
     thoughts: ThoughtWithCategories;
   }>;

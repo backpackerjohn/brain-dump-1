@@ -29,6 +29,7 @@ const BrainDump = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isGeneratingClusters, setIsGeneratingClusters] = useState(false);
   const [isFindingConnections, setIsFindingConnections] = useState(false);
+  const [isFindingRelated, setIsFindingRelated] = useState<string | null>(null);
 
   const {
     thoughts,
@@ -43,7 +44,16 @@ const BrainDump = () => {
   } = useThoughts();
 
   const { categories } = useCategories();
-  const { clusters, connections, generateClusters, findConnections } = useClusters();
+  const { 
+    clusters, 
+    connections, 
+    unclusteredCount,
+    generateClusters, 
+    findConnections,
+    createManualCluster,
+    renameCluster,
+    findRelatedThoughts
+  } = useClusters(thoughts);
   
   const {
     searchQuery,
@@ -96,6 +106,31 @@ const BrainDump = () => {
       setActiveTab("connections");
     } finally {
       setIsFindingConnections(false);
+    }
+  };
+
+  const handleCreateManualCluster = async (name: string) => {
+    try {
+      await createManualCluster(name);
+    } catch (error) {
+      console.error('Error creating cluster:', error);
+    }
+  };
+
+  const handleRenameCluster = async (clusterId: string, newName: string) => {
+    try {
+      await renameCluster(clusterId, newName);
+    } catch (error) {
+      console.error('Error renaming cluster:', error);
+    }
+  };
+
+  const handleFindRelated = async (clusterId: string) => {
+    setIsFindingRelated(clusterId);
+    try {
+      await findRelatedThoughts(clusterId);
+    } finally {
+      setIsFindingRelated(null);
     }
   };
 
@@ -181,9 +216,14 @@ const BrainDump = () => {
             <TabsContent value="clusters">
               <ClustersTab
                 clusters={clusters}
+                unclusteredCount={unclusteredCount}
                 isGenerating={isGeneratingClusters}
                 onGenerate={handleGenerateClusters}
                 onArchive={archiveThought}
+                onCreateManualCluster={handleCreateManualCluster}
+                onRenameCluster={handleRenameCluster}
+                onFindRelated={handleFindRelated}
+                isFindingRelated={isFindingRelated}
               />
             </TabsContent>
 
