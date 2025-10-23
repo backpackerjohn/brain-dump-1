@@ -81,11 +81,6 @@ const BrainDump = () => {
     setIsQuickAddOpen(false);
   };
 
-  const handleAISuggest = async (thoughtId: string) => {
-    const thought = thoughts.find((t) => t.id === thoughtId);
-    const existingCats = thought?.thought_categories?.map((tc: any) => tc.categories.name) || [];
-    await suggestCategories(thoughtId, existingCats);
-  };
 
   const handleGenerateClusters = async () => {
     setIsGeneratingClusters(true);
@@ -239,7 +234,6 @@ const BrainDump = () => {
                     onToggleSelect={toggleThoughtSelection}
                     onArchive={archiveThought}
                     onRemoveCategory={removeCategoryFromThought}
-                    onAISuggest={handleAISuggest}
                   />
                 ))}
               </div>

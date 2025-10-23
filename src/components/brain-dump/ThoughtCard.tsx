@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Check, Edit2, MoreVertical, Plus, X } from "lucide-react";
+import { Check, Edit2, MoreVertical, X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,8 +26,6 @@ interface ThoughtCardProps {
   onArchive?: (id: string) => void;
   onEdit?: (id: string) => void;
   onRemoveCategory?: (thoughtId: string, categoryId: string) => void;
-  onAddCategory?: (thoughtId: string) => void;
-  onAISuggest?: (thoughtId: string) => void;
 }
 
 export function ThoughtCard({
@@ -39,8 +37,6 @@ export function ThoughtCard({
   onArchive,
   onEdit,
   onRemoveCategory,
-  onAddCategory,
-  onAISuggest,
 }: ThoughtCardProps) {
   const [showDone, setShowDone] = useState(false);
 
@@ -92,25 +88,9 @@ export function ThoughtCard({
               />
             </Badge>
           ))}
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 px-2"
-            onClick={() => onAddCategory?.(thought.id)}
-          >
-            <Plus className="h-3 w-3" />
-          </Button>
         </div>
 
-        <div className="flex justify-between items-center">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => onAISuggest?.(thought.id)}
-          >
-            AI Suggest
-          </Button>
-
+        <div className="flex justify-end items-center">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="icon" variant="ghost">
