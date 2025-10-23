@@ -65,9 +65,7 @@ export async function callAIForThoughts(content: string, apiKey: string, systemP
 export async function saveThoughtToDatabase(
   supabaseClient: any,
   userId: string,
-  thought: ProcessedThought,
-  embedding: number[] | null,
-  embeddingFailed: boolean = false
+  thought: ProcessedThought
 ) {
   console.log('Inserting thought into database...');
   const { data: insertedThought, error: thoughtError } = await supabaseClient
@@ -77,11 +75,7 @@ export async function saveThoughtToDatabase(
       content: thought.content,
       title: thought.title,
       snippet: thought.snippet,
-      embedding: embedding,
-      status: 'active',
-      embedding_failed: embeddingFailed,
-      embedding_retry_count: embeddingFailed ? 1 : 0,
-      last_embedding_attempt: embeddingFailed ? new Date().toISOString() : null
+      status: 'active'
     })
     .select()
     .single();

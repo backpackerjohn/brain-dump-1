@@ -2,12 +2,7 @@ export const TOAST_MESSAGES = {
   thought: {
     processed: (count: number) => ({
       title: 'Thoughts processed',
-      description: `${count} thought(s) added`
-    }),
-    processedWithWarning: (count: number, failed: number) => ({
-      title: 'Thoughts saved',
-      description: `${count} thought(s) added, but ${failed} may not cluster properly`,
-      variant: 'default' as const
+      description: `${count} thought(s) organized and ready`
     }),
     processError: (message: string) => ({
       title: 'Error processing thought',
@@ -64,6 +59,10 @@ export const TOAST_MESSAGES = {
     })
   },
   connection: {
+    found: (count: number) => ({
+      title: 'Connections discovered',
+      description: `Found ${count} surprising connection(s) between your thoughts`
+    }),
     findError: (message: string) => ({
       title: 'Error finding connections',
       description: message,

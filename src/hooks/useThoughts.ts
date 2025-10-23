@@ -66,14 +66,7 @@ export function useThoughts() {
       }
 
       const thoughtCount = data?.thoughts?.length || 0;
-      const metadata = data?.metadata;
-
-      // Show appropriate toast based on embedding success
-      if (metadata && metadata.embeddings_failed > 0) {
-        toast(TOAST_MESSAGES.thought.processedWithWarning(thoughtCount, metadata.embeddings_failed));
-      } else {
-        toast(TOAST_MESSAGES.thought.processed(thoughtCount));
-      }
+      toast(TOAST_MESSAGES.thought.processed(thoughtCount));
 
       await fetchThoughts();
       return data.thoughts;
@@ -93,44 +86,6 @@ export function useThoughts() {
     }
   };
 
-  const retryEmbeddings = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('retry-embeddings');
-
-      if (error) {
-        console.error('Retry embeddings error:', error);
-        throw error;
-      }
-
-      if (data.succeeded > 0) {
-        toast({
-          title: 'Embeddings generated',
-          description: `Successfully generated ${data.succeeded} embedding(s)`
-        });
-        await fetchThoughts();
-      } else if (data.retried === 0) {
-        toast({
-          title: 'No thoughts to retry',
-          description: 'All thoughts already have embeddings'
-        });
-      } else {
-        toast({
-          title: 'Retry failed',
-          description: 'Could not generate embeddings. Please try again later.',
-          variant: 'destructive'
-        });
-      }
-
-      return data;
-    } catch (error: any) {
-      toast({
-        title: 'Error retrying embeddings',
-        description: error.message,
-        variant: 'destructive'
-      });
-      throw error;
-    }
-  };
 
   const archiveThought = async (thoughtId: string) => {
     try {
@@ -210,7 +165,6 @@ export function useThoughts() {
     archiveThought,
     restoreThought,
     removeCategoryFromThought,
-    fetchArchivedThoughts,
-    retryEmbeddings
+    fetchArchivedThoughts
   };
 }

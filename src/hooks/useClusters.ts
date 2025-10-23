@@ -48,8 +48,14 @@ export function useClusters() {
       const { data, error } = await supabase.functions.invoke('find-connections');
 
       if (error) throw error;
-      setConnections(data.connections || []);
-      return data.connections;
+      const foundConnections = data.connections || [];
+      setConnections(foundConnections);
+      
+      if (foundConnections.length > 0) {
+        toast(TOAST_MESSAGES.connection.found(foundConnections.length));
+      }
+      
+      return foundConnections;
     } catch (error: any) {
       toast(TOAST_MESSAGES.connection.findError(error.message));
       throw error;

@@ -2,7 +2,6 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { SYSTEM_PROMPT } from './ai-prompts.ts';
-import { generateEmbedding } from './embedding-service.ts';
 import { getOrCreateCategory, linkThoughtToCategory } from './category-service.ts';
 import { callAIForThoughts, saveThoughtToDatabase } from './thought-service.ts';
 
@@ -61,34 +60,16 @@ serve(async (req) => {
 
     const thoughts = await callAIForThoughts(content, LOVABLE_API_KEY, SYSTEM_PROMPT);
 
-    console.log(`Generating embeddings for ${thoughts.length} thought(s)...`);
+    console.log(`Processing ${thoughts.length} thought(s)...`);
     const processedThoughts = [];
-    let embeddingsGenerated = 0;
-    let embeddingsFailed = 0;
     
     for (const thought of thoughts) {
       console.log('Processing thought:', thought.title);
       
-      let embedding: number[] | null = null;
-      let embeddingFailed = false;
-      
-      try {
-        embedding = await generateEmbedding(thought.content, LOVABLE_API_KEY);
-        embeddingsGenerated++;
-        console.log(`✓ Embedding success for: ${thought.title}`);
-      } catch (error) {
-        embeddingFailed = true;
-        embeddingsFailed++;
-        console.error(`✗ Embedding failed for "${thought.title}":`, error);
-        // Continue processing - thought will be saved without embedding
-      }
-      
       const insertedThought = await saveThoughtToDatabase(
         supabase, 
         user.id, 
-        thought, 
-        embedding,
-        embeddingFailed
+        thought
       );
 
       console.log('Processing categories:', thought.categories);
@@ -104,15 +85,12 @@ serve(async (req) => {
     }
 
     console.log(`=== Successfully processed ${processedThoughts.length} thought(s) ===`);
-    console.log(`Embeddings: ${embeddingsGenerated} generated, ${embeddingsFailed} failed`);
     
     return new Response(
       JSON.stringify({ 
         thoughts: processedThoughts,
         metadata: {
-          total: processedThoughts.length,
-          embeddings_generated: embeddingsGenerated,
-          embeddings_failed: embeddingsFailed
+          total: processedThoughts.length
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

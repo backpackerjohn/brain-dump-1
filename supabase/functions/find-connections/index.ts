@@ -13,8 +13,9 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
+    console.log('=== Find Connections Function Started ===');
     
+    const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       throw new Error('No authorization header');
     }
@@ -26,107 +27,162 @@ serve(async (req) => {
     );
 
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
 
-    // Get all thoughts with embeddings
-    const { data: thoughts, error: thoughtsError } = await supabase
+    console.log('Fetching active thoughts for user:', user.id);
+
+    const { data: thoughts, error: fetchError } = await supabase
       .from('thoughts')
       .select(`
         id,
         title,
         snippet,
-        embedding,
+        content,
         thought_categories(
-          categories(name)
+          categories(
+            name
+          )
         )
       `)
       .eq('user_id', user.id)
       .eq('status', 'active')
-      .not('embedding', 'is', null);
+      .limit(50); // Limit to prevent excessive API calls
 
-    if (thoughtsError) throw thoughtsError;
+    if (fetchError) {
+      console.error('Error fetching thoughts:', fetchError);
+      throw fetchError;
+    }
+
     if (!thoughts || thoughts.length < 2) {
+      console.log('Not enough thoughts for connections');
       return new Response(
-        JSON.stringify({ connections: [] }),
+        JSON.stringify({ connections: [], message: 'Need at least 2 thoughts to find connections' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const connections = [];
-    const threshold = 0.3; // Similarity threshold for connections
-    
-    // Find connections between thoughts with different categories
-    for (let i = 0; i < thoughts.length; i++) {
-      for (let j = i + 1; j < thoughts.length; j++) {
-        const thought1 = thoughts[i];
-        const thought2 = thoughts[j];
-        
-        // Get categories for both thoughts
-        const cats1 = thought1.thought_categories?.map(tc => {
-          const categoriesArray = tc.categories as unknown as { name: string }[];
-          return categoriesArray[0]?.name || '';
-        }).filter(Boolean) || [];
-        const cats2 = thought2.thought_categories?.map(tc => {
-          const categoriesArray = tc.categories as unknown as { name: string }[];
-          return categoriesArray[0]?.name || '';
-        }).filter(Boolean) || [];
-        
-        // Only consider if they have different categories (non-obvious connections)
-        const hasOverlap = cats1.some(c => cats2.includes(c));
-        if (hasOverlap) continue;
-        
-        // Calculate cosine similarity
-        const similarity = calculateCosineSimilarity(
-          thought1.embedding,
-          thought2.embedding
-        );
-        
-        if (similarity > (1 - threshold)) {
-          connections.push({
-            thought1: {
-              id: thought1.id,
-              title: thought1.title,
-              categories: cats1
-            },
-            thought2: {
-              id: thought2.id,
-              title: thought2.title,
-              categories: cats2
-            },
-            similarity: similarity,
-            reason: 'Semantically related despite different categories'
-          });
-        }
-      }
+    console.log(`Analyzing ${thoughts.length} thoughts for connections`);
+
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY not configured');
     }
+
+    // Prepare thought data for AI analysis
+    const thoughtSummaries = thoughts.map(t => {
+      const categories = t.thought_categories?.map((tc: any) => tc.categories.name) || [];
+      return {
+        id: t.id,
+        title: t.title,
+        snippet: t.snippet || t.content.substring(0, 150),
+        categories: categories
+      };
+    }).slice(0, 20); // Limit to 20 thoughts to keep token count reasonable
+
+    const analysisPrompt = `Analyze these thoughts and find 3-5 surprising, non-obvious connections between them. Focus on thoughts from DIFFERENT categories that share hidden themes or could inspire each other.
+
+${thoughtSummaries.map((t, i) => `${i + 1}. "${t.title}" (${t.categories.join(', ')})\n   ${t.snippet}`).join('\n\n')}
+
+Return a JSON object with this structure:
+{
+  "connections": [
+    {
+      "thought1_index": 0,
+      "thought2_index": 3,
+      "reason": "Brief explanation of the surprising connection"
+    }
+  ]
+}
+
+Focus on quality over quantity. Only include truly interesting connections.`;
+
+    console.log('Calling AI to find connections...');
+
+    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert at finding non-obvious connections between ideas. You look for surprising patterns, complementary concepts, and creative synergies.'
+          },
+          {
+            role: 'user',
+            content: analysisPrompt
+          }
+        ],
+        response_format: { type: "json_object" }
+      }),
+    });
+
+    if (!aiResponse.ok) {
+      const errorText = await aiResponse.text();
+      console.error('AI API error:', aiResponse.status, errorText);
+      throw new Error(`AI API request failed: ${aiResponse.status}`);
+    }
+
+    const aiData = await aiResponse.json();
+    const aiContent = aiData.choices[0].message.content;
     
-    // Sort by similarity descending
-    connections.sort((a, b) => b.similarity - a.similarity);
+    let parsedConnections;
+    try {
+      parsedConnections = JSON.parse(aiContent);
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', parseError);
+      throw new Error('Invalid AI response format');
+    }
+
+    // Map indices back to actual thoughts
+    const connections = (parsedConnections.connections || [])
+      .filter((conn: any) => 
+        conn.thought1_index !== undefined && 
+        conn.thought2_index !== undefined &&
+        thoughtSummaries[conn.thought1_index] &&
+        thoughtSummaries[conn.thought2_index]
+      )
+      .map((conn: any) => {
+        const t1 = thoughtSummaries[conn.thought1_index];
+        const t2 = thoughtSummaries[conn.thought2_index];
+        
+        return {
+          thought1: {
+            title: t1.title,
+            categories: t1.categories
+          },
+          thought2: {
+            title: t2.title,
+            categories: t2.categories
+          },
+          reason: conn.reason
+        };
+      })
+      .slice(0, 10); // Limit to top 10 connections
+
+    console.log(`Found ${connections.length} connections`);
 
     return new Response(
-      JSON.stringify({ connections: connections.slice(0, 10) }),
+      JSON.stringify({ connections }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
+
   } catch (error) {
-    console.error('Error finding connections:', error);
+    console.error('=== Error Finding Connections ===');
+    console.error('Error:', error instanceof Error ? error.message : String(error));
+    
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    const statusCode = errorMessage.includes('authenticated') ? 401 : 
+                       errorMessage.includes('LOVABLE_API_KEY') ? 500 : 500;
+    
     return new Response(
       JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: statusCode, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
-
-function calculateCosineSimilarity(a: number[], b: number[]): number {
-  let dotProduct = 0;
-  let normA = 0;
-  let normB = 0;
-  
-  for (let i = 0; i < a.length; i++) {
-    dotProduct += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
-  }
-  
-  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-}
