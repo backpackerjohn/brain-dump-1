@@ -17,7 +17,7 @@ interface ThoughtCardProps {
     title: string;
     snippet: string | null;
     status: string;
-    categories?: Array<{ categories: { id: string; name: string } }>;
+    thought_categories?: Array<{ categories: { id: string; name: string } }>;
   };
   isSelectMode?: boolean;
   isSelected?: boolean;
@@ -75,7 +75,7 @@ export function ThoughtCard({
         )}
 
         <div className="flex flex-wrap gap-2 mb-3">
-          {thought.categories?.map((tc) => (
+          {thought.thought_categories?.map((tc) => (
             <Badge
               key={tc.categories.id}
               variant="secondary"
