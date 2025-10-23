@@ -1,0 +1,45 @@
+export interface Thought {
+  id: string;
+  user_id: string;
+  content: string;
+  title: string;
+  snippet: string | null;
+  status: 'active' | 'archived';
+  embedding: number[] | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+}
+
+export interface ThoughtCategory {
+  categories: Category;
+}
+
+export interface ThoughtWithCategories extends Thought {
+  thought_categories?: ThoughtCategory[];
+}
+
+export interface Cluster {
+  id: string;
+  name: string;
+  created_at: string;
+  thought_clusters?: Array<{
+    thoughts: ThoughtWithCategories;
+  }>;
+}
+
+export interface Connection {
+  thought1: {
+    title: string;
+    categories: string[];
+  };
+  thought2: {
+    title: string;
+    categories: string[];
+  };
+  reason: string;
+}
