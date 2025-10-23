@@ -34,9 +34,15 @@ export function useClusters() {
 
       if (error) throw error;
 
-      toast(TOAST_MESSAGES.cluster.generated(data.clusters.length));
+      if (!data || (data as any).error) {
+        const message = (data as any)?.error || 'Failed to generate clusters';
+        toast(TOAST_MESSAGES.cluster.generateError(message));
+        return [];
+      }
+
+      toast(TOAST_MESSAGES.cluster.generated((data as any).clusters.length));
       await fetchClusters();
-      return data.clusters;
+      return (data as any).clusters;
     } catch (error: any) {
       toast(TOAST_MESSAGES.cluster.generateError(error.message));
       throw error;
