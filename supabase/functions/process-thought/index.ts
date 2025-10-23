@@ -63,12 +63,33 @@ serve(async (req) => {
 
     console.log(`Generating embeddings for ${thoughts.length} thought(s)...`);
     const processedThoughts = [];
+    let embeddingsGenerated = 0;
+    let embeddingsFailed = 0;
     
     for (const thought of thoughts) {
       console.log('Processing thought:', thought.title);
       
-      const embedding = await generateEmbedding(thought.content, LOVABLE_API_KEY);
-      const insertedThought = await saveThoughtToDatabase(supabase, user.id, thought, embedding);
+      let embedding: number[] | null = null;
+      let embeddingFailed = false;
+      
+      try {
+        embedding = await generateEmbedding(thought.content, LOVABLE_API_KEY);
+        embeddingsGenerated++;
+        console.log(`✓ Embedding success for: ${thought.title}`);
+      } catch (error) {
+        embeddingFailed = true;
+        embeddingsFailed++;
+        console.error(`✗ Embedding failed for "${thought.title}":`, error);
+        // Continue processing - thought will be saved without embedding
+      }
+      
+      const insertedThought = await saveThoughtToDatabase(
+        supabase, 
+        user.id, 
+        thought, 
+        embedding,
+        embeddingFailed
+      );
 
       console.log('Processing categories:', thought.categories);
       for (const categoryName of thought.categories) {
@@ -83,9 +104,17 @@ serve(async (req) => {
     }
 
     console.log(`=== Successfully processed ${processedThoughts.length} thought(s) ===`);
+    console.log(`Embeddings: ${embeddingsGenerated} generated, ${embeddingsFailed} failed`);
     
     return new Response(
-      JSON.stringify({ thoughts: processedThoughts }),
+      JSON.stringify({ 
+        thoughts: processedThoughts,
+        metadata: {
+          total: processedThoughts.length,
+          embeddings_generated: embeddingsGenerated,
+          embeddings_failed: embeddingsFailed
+        }
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

@@ -40,6 +40,7 @@ const BrainDump = () => {
     restoreThought,
     removeCategoryFromThought,
     fetchArchivedThoughts,
+    retryEmbeddings,
   } = useThoughts();
 
   const { categories } = useCategories();
@@ -81,11 +82,32 @@ const BrainDump = () => {
   };
 
   const handleGenerateClusters = async () => {
+    // Check if thoughts have embeddings
+    const thoughtsWithEmbeddings = thoughts.filter(t => t.embedding && !t.embedding_failed);
+    const thoughtsNeedingEmbeddings = thoughts.filter(t => !t.embedding || t.embedding_failed);
+    
+    if (thoughtsNeedingEmbeddings.length > 0) {
+      toast({
+        title: 'Some thoughts missing embeddings',
+        description: `${thoughtsWithEmbeddings.length}/${thoughts.length} thoughts ready. Click "Retry Embeddings" first.`,
+        variant: 'default'
+      });
+    }
+    
     setIsGeneratingClusters(true);
     try {
       await generateClusters();
     } finally {
       setIsGeneratingClusters(false);
+    }
+  };
+
+  const handleRetryEmbeddings = async () => {
+    setIsProcessing(true);
+    try {
+      await retryEmbeddings();
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -179,12 +201,33 @@ const BrainDump = () => {
             </TabsContent>
 
             <TabsContent value="clusters">
-              <ClustersTab
-                clusters={clusters}
-                isGenerating={isGeneratingClusters}
-                onGenerate={handleGenerateClusters}
-                onArchive={archiveThought}
-              />
+              <div className="space-y-4">
+                {thoughts.some(t => !t.embedding || t.embedding_failed) && (
+                  <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">
+                        {thoughts.filter(t => !t.embedding || t.embedding_failed).length} thought(s) need embedding generation
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Embeddings enable semantic clustering and connections
+                      </p>
+                    </div>
+                    <Button 
+                      onClick={handleRetryEmbeddings} 
+                      disabled={isProcessing}
+                      variant="outline"
+                    >
+                      {isProcessing ? "Retrying..." : "Retry Embeddings"}
+                    </Button>
+                  </div>
+                )}
+                <ClustersTab
+                  clusters={clusters}
+                  isGenerating={isGeneratingClusters}
+                  onGenerate={handleGenerateClusters}
+                  onArchive={archiveThought}
+                />
+              </div>
             </TabsContent>
 
             <TabsContent value="connections">

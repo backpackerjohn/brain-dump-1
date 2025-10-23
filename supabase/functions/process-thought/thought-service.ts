@@ -66,7 +66,8 @@ export async function saveThoughtToDatabase(
   supabaseClient: any,
   userId: string,
   thought: ProcessedThought,
-  embedding: number[] | null
+  embedding: number[] | null,
+  embeddingFailed: boolean = false
 ) {
   console.log('Inserting thought into database...');
   const { data: insertedThought, error: thoughtError } = await supabaseClient
@@ -77,7 +78,10 @@ export async function saveThoughtToDatabase(
       title: thought.title,
       snippet: thought.snippet,
       embedding: embedding,
-      status: 'active'
+      status: 'active',
+      embedding_failed: embeddingFailed,
+      embedding_retry_count: embeddingFailed ? 1 : 0,
+      last_embedding_attempt: embeddingFailed ? new Date().toISOString() : null
     })
     .select()
     .single();

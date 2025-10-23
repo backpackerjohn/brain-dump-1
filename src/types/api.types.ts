@@ -6,6 +6,11 @@ export interface ProcessThoughtRequest {
 
 export interface ProcessThoughtResponse {
   thoughts: ThoughtWithCategories[];
+  metadata?: {
+    total: number;
+    embeddings_generated: number;
+    embeddings_failed: number;
+  };
 }
 
 export interface SuggestCategoriesRequest {

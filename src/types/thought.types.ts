@@ -6,6 +6,9 @@ export interface Thought {
   snippet: string | null;
   status: 'active' | 'archived';
   embedding: number[] | null;
+  embedding_failed?: boolean;
+  embedding_retry_count?: number;
+  last_embedding_attempt?: string;
   created_at: string;
   updated_at: string;
 }

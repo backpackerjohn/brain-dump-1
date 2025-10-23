@@ -4,6 +4,11 @@ export const TOAST_MESSAGES = {
       title: 'Thoughts processed',
       description: `${count} thought(s) added`
     }),
+    processedWithWarning: (count: number, failed: number) => ({
+      title: 'Thoughts saved',
+      description: `${count} thought(s) added, but ${failed} may not cluster properly`,
+      variant: 'default' as const
+    }),
     processError: (message: string) => ({
       title: 'Error processing thought',
       description: message,

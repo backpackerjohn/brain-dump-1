@@ -14,7 +14,162 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      clusters: {
+        Row: {
+          created_at: string
+          id: string
+          is_collapsed: boolean
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_collapsed?: boolean
+          name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_collapsed?: boolean
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      thought_categories: {
+        Row: {
+          category_id: string
+          created_at: string
+          thought_id: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          thought_id: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          thought_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "thought_categories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "thought_categories_thought_id_fkey"
+            columns: ["thought_id"]
+            isOneToOne: false
+            referencedRelation: "thoughts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      thought_clusters: {
+        Row: {
+          cluster_id: string
+          created_at: string
+          is_completed: boolean
+          thought_id: string
+        }
+        Insert: {
+          cluster_id: string
+          created_at?: string
+          is_completed?: boolean
+          thought_id: string
+        }
+        Update: {
+          cluster_id?: string
+          created_at?: string
+          is_completed?: boolean
+          thought_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "thought_clusters_cluster_id_fkey"
+            columns: ["cluster_id"]
+            isOneToOne: false
+            referencedRelation: "clusters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "thought_clusters_thought_id_fkey"
+            columns: ["thought_id"]
+            isOneToOne: false
+            referencedRelation: "thoughts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      thoughts: {
+        Row: {
+          content: string
+          created_at: string
+          embedding: string | null
+          embedding_failed: boolean | null
+          embedding_retry_count: number | null
+          id: string
+          last_embedding_attempt: string | null
+          snippet: string | null
+          status: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          embedding?: string | null
+          embedding_failed?: boolean | null
+          embedding_retry_count?: number | null
+          id?: string
+          last_embedding_attempt?: string | null
+          snippet?: string | null
+          status?: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          embedding?: string | null
+          embedding_failed?: boolean | null
+          embedding_retry_count?: number | null
+          id?: string
+          last_embedding_attempt?: string | null
+          snippet?: string | null
+          status?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
