@@ -40,6 +40,7 @@ export type Database = {
           created_at: string
           id: string
           is_collapsed: boolean
+          is_manual: boolean
           name: string
           user_id: string
         }
@@ -47,6 +48,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_collapsed?: boolean
+          is_manual?: boolean
           name: string
           user_id: string
         }
@@ -54,6 +56,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_collapsed?: boolean
+          is_manual?: boolean
           name?: string
           user_id?: string
         }
