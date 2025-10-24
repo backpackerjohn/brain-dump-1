@@ -171,7 +171,7 @@ serve(async (req) => {
     if (thoughts.length > 0) {
       const ids = thoughts.map((t: any) => t.id);
       const { data: links, error: linksError } = await supabase
-        .from('cluster_thoughts')
+        .from('thought_clusters')
         .select('thought_id')
         .in('thought_id', ids);
       
@@ -303,9 +303,9 @@ serve(async (req) => {
 
       // Use upsert to avoid conflicts
       const { error: linkError } = await supabase
-        .from('cluster_thoughts')
+        .from('thought_clusters')
         .upsert(thoughtClusterLinks, {
-          onConflict: 'cluster_id,thought_id',
+          onConflict: 'thought_id,cluster_id',
           ignoreDuplicates: true
         });
 

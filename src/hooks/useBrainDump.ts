@@ -14,7 +14,7 @@ import { useClusters } from './useClusters';
 export function useBrainDump() {
   const thoughtsHook = useThoughts();
   const categoriesHook = useCategories();
-  const clustersHook = useClusters();
+  const clustersHook = useClusters(thoughtsHook.thoughts);
 
   return {
     ...thoughtsHook,

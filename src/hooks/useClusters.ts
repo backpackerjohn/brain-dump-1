@@ -27,18 +27,23 @@ export function useClusters(thoughts: ThoughtWithCategories[]) {
 
   const fetchClusters = async () => {
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('clusters')
         .select(`
           *,
           thought_clusters(
-            thoughts(*)
+            thoughts(
+              *,
+              thought_categories(
+                categories(*)
+              )
+            )
           )
         `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setClusters(data || []);
+      setClusters(data as any || []);
     } catch (error: any) {
       toast(TOAST_MESSAGES.cluster.fetchError(error.message));
     }

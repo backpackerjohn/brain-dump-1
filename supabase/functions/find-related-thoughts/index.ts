@@ -41,7 +41,7 @@ serve(async (req) => {
 
     // Get thoughts in this cluster (as examples)
     const { data: clusterThoughts, error: clusterError } = await supabase
-      .from('cluster_thoughts')
+      .from('thought_clusters')
       .select(`
         thoughts (
           id,
@@ -84,7 +84,7 @@ serve(async (req) => {
     
     // Get all clustered thought IDs
     const { data: clustered, error: clusteredError } = await supabase
-      .from('cluster_thoughts')
+      .from('thought_clusters')
       .select('thought_id')
       .in('thought_id', allThoughtIds);
 
@@ -217,7 +217,7 @@ Be selective - only include thoughts that genuinely fit the theme. It's better t
       }));
 
       const { error: linkError } = await supabase
-        .from('cluster_thoughts')
+        .from('thought_clusters')
         .insert(links);
 
       if (linkError) {
