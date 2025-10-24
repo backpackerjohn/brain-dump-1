@@ -156,8 +156,6 @@ serve(async (req) => {
       .from('thoughts')
       .select(`
         id,
-        title,
-        snippet,
         content
       `)
       .eq('user_id', user.id)
@@ -173,7 +171,7 @@ serve(async (req) => {
     if (thoughts.length > 0) {
       const ids = thoughts.map((t: any) => t.id);
       const { data: links, error: linksError } = await supabase
-        .from('thought_clusters')
+        .from('cluster_thoughts')
         .select('thought_id')
         .in('thought_id', ids);
       
@@ -208,7 +206,7 @@ serve(async (req) => {
     // Prepare thoughts for AI processing
     const thoughtInputs: ThoughtInput[] = thoughts.map((t: any) => ({
       id: t.id,
-      text: `${t.title}: ${t.content || t.snippet || ''}`
+      text: t.content || ''
     }));
 
     // RULE #2: Chunking Protocol for scalability
@@ -278,20 +276,20 @@ serve(async (req) => {
         console.log(`Adding thoughts to existing cluster: ${cluster.clusterName}`);
       } else {
         // Create new cluster
-        const { data: newCluster, error: clusterError } = await supabase
-          .from('clusters')
-          .insert({
-            user_id: user.id,
+      const { data: newCluster, error: clusterError } = await supabase
+        .from('clusters')
+        .insert({
+          user_id: user.id,
             name: cluster.clusterName,
             is_manual: false
-          })
-          .select()
-          .single();
+        })
+        .select()
+        .single();
 
-        if (clusterError) {
-          console.error('Error creating cluster:', clusterError);
-          continue;
-        }
+      if (clusterError) {
+        console.error('Error creating cluster:', clusterError);
+        continue;
+      }
 
         clusterId = newCluster.id;
         createdClusters.push(newCluster);
@@ -305,9 +303,9 @@ serve(async (req) => {
 
       // Use upsert to avoid conflicts
       const { error: linkError } = await supabase
-        .from('thought_clusters')
+        .from('cluster_thoughts')
         .upsert(thoughtClusterLinks, {
-          onConflict: 'thought_id,cluster_id',
+          onConflict: 'cluster_id,thought_id',
           ignoreDuplicates: true
         });
 

@@ -41,13 +41,11 @@ serve(async (req) => {
 
     // Get thoughts in this cluster (as examples)
     const { data: clusterThoughts, error: clusterError } = await supabase
-      .from('thought_clusters')
+      .from('cluster_thoughts')
       .select(`
         thoughts (
           id,
-          title,
-          content,
-          snippet
+          content
         )
       `)
       .eq('cluster_id', clusterId);
@@ -86,7 +84,7 @@ serve(async (req) => {
     
     // Get all clustered thought IDs
     const { data: clustered, error: clusteredError } = await supabase
-      .from('thought_clusters')
+      .from('cluster_thoughts')
       .select('thought_id')
       .in('thought_id', allThoughtIds);
 
@@ -114,7 +112,7 @@ serve(async (req) => {
     // Fetch full unclustered thoughts
     const { data: unclusteredThoughts, error: unclusteredError } = await supabase
       .from('thoughts')
-      .select('id, title, content, snippet')
+      .select('id, content')
       .in('id', unclusteredIds);
 
     if (unclusteredError) {
@@ -129,12 +127,12 @@ serve(async (req) => {
     }
 
     const exampleTexts = clusterThoughts
-      .map((ct: any) => `${ct.thoughts.title}: ${ct.thoughts.content || ct.thoughts.snippet || ''}`)
+      .map((ct: any) => ct.thoughts.content || '')
       .join('\n\n');
 
     const candidateThoughts = unclusteredThoughts.map(t => ({
       id: t.id,
-      text: `${t.title}: ${t.content || t.snippet || ''}`
+      text: t.content || ''
     }));
 
     const prompt = `You are helping a user organize their thoughts. They have manually created a cluster with the following thoughts as examples:
@@ -219,7 +217,7 @@ Be selective - only include thoughts that genuinely fit the theme. It's better t
       }));
 
       const { error: linkError } = await supabase
-        .from('thought_clusters')
+        .from('cluster_thoughts')
         .insert(links);
 
       if (linkError) {
