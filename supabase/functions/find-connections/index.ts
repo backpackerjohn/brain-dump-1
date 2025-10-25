@@ -40,6 +40,7 @@ serve(async (req) => {
         title,
         snippet,
         content,
+        is_completed,
         thought_categories(
           categories(
             name
@@ -48,6 +49,7 @@ serve(async (req) => {
       `)
       .eq('user_id', user.id)
       .eq('status', 'active')
+      .eq('is_completed', false)
       .limit(50); // Limit to prevent excessive API calls
 
     if (fetchError) {
@@ -152,13 +154,17 @@ Focus on quality over quantity. Only include truly interesting connections.`;
         const t2 = thoughtSummaries[conn.thought2_index];
         
         return {
+          thought1_id: t1.id,
+          thought2_id: t2.id,
           thought1: {
             title: t1.title,
-            categories: t1.categories
+            categories: t1.categories,
+            is_completed: false
           },
           thought2: {
             title: t2.title,
-            categories: t2.categories
+            categories: t2.categories,
+            is_completed: false
           },
           reason: conn.reason
         };

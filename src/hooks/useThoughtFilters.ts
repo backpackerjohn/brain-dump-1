@@ -13,7 +13,7 @@ export function useThoughtFilters(thoughts: ThoughtWithCategories[]) {
     );
   };
 
-  const filteredThoughts = thoughts.filter((thought) => {
+  const filtered = thoughts.filter((thought) => {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       if (
@@ -34,6 +34,19 @@ export function useThoughtFilters(thoughts: ThoughtWithCategories[]) {
 
     return true;
   });
+
+  // Sort thoughts: active first, completed last
+  const active = filtered.filter(t => !t.is_completed);
+  const completed = filtered.filter(t => t.is_completed);
+  
+  const filteredThoughts = [
+    ...active.sort((a, b) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    ),
+    ...completed.sort((a, b) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )
+  ];
 
   return {
     searchQuery,

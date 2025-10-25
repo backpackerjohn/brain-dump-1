@@ -5,6 +5,7 @@ export interface Thought {
   title: string;
   snippet: string | null;
   status: 'active' | 'archived';
+  is_completed: boolean;
   embedding: number[] | null;
   embedding_failed?: boolean;
   embedding_retry_count?: number;
@@ -35,17 +36,22 @@ export interface Cluster {
   updated_at?: string;
   thought_clusters?: Array<{
     thoughts: ThoughtWithCategories;
+    is_completed?: boolean;
   }>;
 }
 
 export interface Connection {
+  thought1_id: string;
+  thought2_id: string;
   thought1: {
     title: string;
     categories: string[];
+    is_completed: boolean;
   };
   thought2: {
     title: string;
     categories: string[];
+    is_completed: boolean;
   };
   reason: string;
 }

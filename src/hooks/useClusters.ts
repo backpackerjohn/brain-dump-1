@@ -243,6 +243,59 @@ export function useClusters(thoughts: ThoughtWithCategories[]) {
     }
   };
 
+  const checkClusterCompletion = (cluster: Cluster) => {
+    if (!cluster.thought_clusters || cluster.thought_clusters.length === 0) {
+      return { completed: 0, total: 0, isFullyCompleted: false };
+    }
+    
+    const activeThoughts = cluster.thought_clusters.filter(
+      tc => tc.thoughts.status === 'active'
+    );
+    
+    const completedThoughts = activeThoughts.filter(
+      tc => tc.thoughts.is_completed
+    );
+    
+    return {
+      completed: completedThoughts.length,
+      total: activeThoughts.length,
+      isFullyCompleted: activeThoughts.length > 0 && 
+                        completedThoughts.length === activeThoughts.length
+    };
+  };
+
+  const archiveCluster = async (clusterId: string) => {
+    try {
+      const cluster = clusters.find(c => c.id === clusterId);
+      if (!cluster?.thought_clusters) return;
+      
+      const thoughtIds = cluster.thought_clusters.map(tc => tc.thoughts.id);
+      
+      await Promise.all(
+        thoughtIds.map(id =>
+          supabase
+            .from('thoughts')
+            .update({ status: 'archived' })
+            .eq('id', id)
+        )
+      );
+      
+      toast({
+        title: 'Cluster archived',
+        description: `"${cluster.name}" and all its thoughts moved to archive`
+      });
+      
+      await fetchClusters();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive'
+      });
+      throw error;
+    }
+  };
+
   useEffect(() => {
     fetchClusters();
   }, []);
@@ -258,6 +311,8 @@ export function useClusters(thoughts: ThoughtWithCategories[]) {
     addThoughtToCluster,
     removeThoughtFromCluster,
     findRelatedThoughts,
-    findConnections
+    findConnections,
+    checkClusterCompletion,
+    archiveCluster
   };
 }

@@ -9,6 +9,7 @@ import { AllThoughtsTab } from "@/components/brain-dump/AllThoughtsTab";
 import { ClustersTab } from "@/components/brain-dump/ClustersTab";
 import { ConnectionsTab } from "@/components/brain-dump/ConnectionsTab";
 import { ArchiveTab } from "@/components/brain-dump/ArchiveTab";
+import { EditThoughtModal } from "@/components/brain-dump/EditThoughtModal";
 import { useThoughts } from "@/hooks/useThoughts";
 import { useCategories } from "@/hooks/useCategories";
 import { useClusters } from "@/hooks/useClusters";
@@ -18,6 +19,7 @@ import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { validateThoughtContent } from "@/utils/validation";
 import { TOAST_MESSAGES } from "@/utils/toast-messages";
+import { ThoughtWithCategories } from "@/types/thought.types";
 
 const BrainDump = () => {
   const { toast } = useToast();
@@ -30,6 +32,9 @@ const BrainDump = () => {
   const [isGeneratingClusters, setIsGeneratingClusters] = useState(false);
   const [isFindingConnections, setIsFindingConnections] = useState(false);
   const [isFindingRelated, setIsFindingRelated] = useState<string | null>(null);
+  const [editingThought, setEditingThought] = useState<ThoughtWithCategories | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const {
     thoughts,
@@ -40,6 +45,9 @@ const BrainDump = () => {
     archiveThought,
     restoreThought,
     removeCategoryFromThought,
+    toggleThoughtCompletion,
+    updateThought,
+    addCategoryToThought,
     fetchArchivedThoughts,
   } = useThoughts();
 
@@ -52,7 +60,9 @@ const BrainDump = () => {
     findConnections,
     createManualCluster,
     renameCluster,
-    findRelatedThoughts
+    findRelatedThoughts,
+    checkClusterCompletion,
+    archiveCluster
   } = useClusters(thoughts);
   
   const {
@@ -153,6 +163,43 @@ const BrainDump = () => {
     setIsSelectMode(false);
   };
 
+  const handleMarkDone = async (thoughtId: string) => {
+    try {
+      await toggleThoughtCompletion(thoughtId);
+    } catch (error) {
+      console.error('Error toggling completion:', error);
+    }
+  };
+
+  const handleEdit = (thoughtId: string) => {
+    const thought = thoughts.find(t => t.id === thoughtId);
+    if (thought) {
+      setEditingThought(thought);
+      setIsEditModalOpen(true);
+    }
+  };
+
+  const handleSaveEdit = async (
+    thoughtId: string,
+    updates: { title: string; snippet: string | null }
+  ) => {
+    setIsSavingEdit(true);
+    try {
+      await updateThought(thoughtId, updates);
+      setIsEditModalOpen(false);
+      setEditingThought(null);
+    } catch (error) {
+      console.error('Error saving edit:', error);
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleAddCategory = async (thoughtId: string) => {
+    // This will be handled by CategorySelector component
+    // For now, we'll just pass the addCategoryToThought function
+  };
+
   useEffect(() => {
     if (activeTab === "archive" && archivedThoughts.length === 0) {
       fetchArchivedThoughts();
@@ -210,6 +257,9 @@ const BrainDump = () => {
                 onBulkArchive={handleBulkArchive}
                 onArchive={archiveThought}
                 onRemoveCategory={removeCategoryFromThought}
+                onMarkDone={handleMarkDone}
+                onEdit={handleEdit}
+                onAddCategory={handleAddCategory}
               />
             </TabsContent>
 
@@ -224,6 +274,9 @@ const BrainDump = () => {
                 onRenameCluster={handleRenameCluster}
                 onFindRelated={handleFindRelated}
                 isFindingRelated={isFindingRelated}
+                checkClusterCompletion={checkClusterCompletion}
+                onArchiveCluster={archiveCluster}
+                onMarkDone={handleMarkDone}
               />
             </TabsContent>
 
@@ -265,6 +318,17 @@ const BrainDump = () => {
           onClose={() => setIsQuickAddOpen(false)}
           onSubmit={handleQuickAdd}
           isProcessing={isProcessing}
+        />
+
+        <EditThoughtModal
+          thought={editingThought}
+          isOpen={isEditModalOpen}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setEditingThought(null);
+          }}
+          onSave={handleSaveEdit}
+          isSaving={isSavingEdit}
         />
       </main>
     </div>

@@ -25,6 +25,23 @@ export const TOAST_MESSAGES = {
       title: 'Error restoring thought',
       description: message,
       variant: 'destructive' as const
+    }),
+    completed: {
+      title: 'Thought completed',
+      description: 'Marked as done'
+    },
+    uncompleted: {
+      title: 'Thought unmarked',
+      description: 'Moved back to active'
+    },
+    updated: {
+      title: 'Thought updated',
+      description: 'Changes saved successfully'
+    },
+    updateError: (message: string) => ({
+      title: 'Error updating thought',
+      description: message,
+      variant: 'destructive' as const
     })
   },
   category: {
@@ -40,6 +57,19 @@ export const TOAST_MESSAGES = {
       title: 'Error fetching categories',
       description: message,
       variant: 'destructive' as const
+    }),
+    added: {
+      title: 'Category added',
+      description: 'Category linked to thought'
+    },
+    addError: (message: string) => ({
+      title: 'Error adding category',
+      description: message,
+      variant: 'destructive' as const
+    }),
+    created: (name: string) => ({
+      title: 'Category created',
+      description: `Created new category: ${name}`
     })
   },
   cluster: {
@@ -56,6 +86,10 @@ export const TOAST_MESSAGES = {
       title: 'Error fetching clusters',
       description: message,
       variant: 'destructive' as const
+    }),
+    allCompleted: (name: string) => ({
+      title: 'Cluster completed!',
+      description: `All thoughts in "${name}" are done. Archive cluster?`
     })
   },
   connection: {

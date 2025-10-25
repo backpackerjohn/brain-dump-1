@@ -19,6 +19,17 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Progress } from '@/components/ui/progress';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface ClustersTabProps {
   clusters: Cluster[];
@@ -30,6 +41,13 @@ interface ClustersTabProps {
   onRenameCluster: (clusterId: string, newName: string) => void;
   onFindRelated: (clusterId: string) => void;
   isFindingRelated?: string | null;
+  checkClusterCompletion: (cluster: Cluster) => {
+    completed: number;
+    total: number;
+    isFullyCompleted: boolean;
+  };
+  onArchiveCluster: (clusterId: string) => void;
+  onMarkDone?: (id: string) => void;
 }
 
 export function ClustersTab({ 
@@ -41,13 +59,17 @@ export function ClustersTab({
   onCreateManualCluster,
   onRenameCluster,
   onFindRelated,
-  isFindingRelated
+  isFindingRelated,
+  checkClusterCompletion,
+  onArchiveCluster,
+  onMarkDone
 }: ClustersTabProps) {
   const [openClusters, setOpenClusters] = useState<Set<string>>(new Set());
   const [editingCluster, setEditingCluster] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [creatingCluster, setCreatingCluster] = useState(false);
   const [newClusterName, setNewClusterName] = useState('');
+  const [clusterToArchive, setClusterToArchive] = useState<Cluster | null>(null);
 
   const toggleCluster = (clusterId: string) => {
     setOpenClusters(prev => {
@@ -216,6 +238,10 @@ export function ClustersTab({
             const thoughtCount = getThoughtCount(cluster);
             const isEditing = editingCluster === cluster.id;
             const isFinding = isFindingRelated === cluster.id;
+            const completionStats = checkClusterCompletion(cluster);
+            const progress = completionStats.total > 0 
+              ? (completionStats.completed / completionStats.total) * 100 
+              : 0;
 
             return (
               <Collapsible
@@ -281,10 +307,33 @@ export function ClustersTab({
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2 ml-4">
-                      <span className="text-sm text-muted-foreground">
-                        {thoughtCount} thought{thoughtCount !== 1 ? 's' : ''}
-                      </span>
+                    <div className="flex items-center gap-3 ml-4">
+                      {completionStats.total > 0 && (
+                        <>
+                          <Progress value={progress} className="w-24 h-2" />
+                          <span className="text-sm text-muted-foreground whitespace-nowrap">
+                            {completionStats.completed}/{completionStats.total}
+                          </span>
+                        </>
+                      )}
+                      
+                      {!completionStats.total && (
+                        <span className="text-sm text-muted-foreground">
+                          {thoughtCount} thought{thoughtCount !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                      
+                      {completionStats.isFullyCompleted && (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => setClusterToArchive(cluster)}
+                          className="bg-green-500 hover:bg-green-600"
+                        >
+                          <Check className="mr-2 h-4 w-4" />
+                          Archive Cluster
+                        </Button>
+                      )}
                     </div>
                   </div>
 
@@ -319,6 +368,7 @@ export function ClustersTab({
                               key={tc.thoughts.id}
                               thought={tc.thoughts}
                               onArchive={onArchive}
+                              onMarkDone={onMarkDone}
                             />
                           ))}
                         </div>
@@ -331,6 +381,34 @@ export function ClustersTab({
           })}
         </div>
       )}
+
+      <AlertDialog 
+        open={!!clusterToArchive} 
+        onOpenChange={() => setClusterToArchive(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive completed cluster?</AlertDialogTitle>
+            <AlertDialogDescription>
+              All {clusterToArchive?.thought_clusters?.length} thoughts in "{clusterToArchive?.name}" 
+              will be moved to the Archive tab. You can restore them later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (clusterToArchive) {
+                  onArchiveCluster(clusterToArchive.id);
+                  setClusterToArchive(null);
+                }
+              }}
+            >
+              Archive Cluster
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -133,6 +133,77 @@ export function useThoughts() {
     }
   };
 
+  const toggleThoughtCompletion = async (thoughtId: string) => {
+    try {
+      const thought = thoughts.find(t => t.id === thoughtId);
+      if (!thought) throw new Error('Thought not found');
+      
+      const newCompletionState = !thought.is_completed;
+      
+      const { error } = await (supabase as any)
+        .from('thoughts')
+        .update({ is_completed: newCompletionState })
+        .eq('id', thoughtId);
+
+      if (error) throw error;
+      
+      toast(newCompletionState 
+        ? TOAST_MESSAGES.thought.completed 
+        : TOAST_MESSAGES.thought.uncompleted
+      );
+      
+      await fetchThoughts();
+      return newCompletionState;
+    } catch (error: any) {
+      toast(TOAST_MESSAGES.thought.updateError(error.message));
+      throw error;
+    }
+  };
+
+  const updateThought = async (
+    thoughtId: string, 
+    updates: { title?: string; snippet?: string | null }
+  ) => {
+    try {
+      const { error } = await (supabase as any)
+        .from('thoughts')
+        .update(updates)
+        .eq('id', thoughtId);
+
+      if (error) throw error;
+      
+      toast(TOAST_MESSAGES.thought.updated);
+      await fetchThoughts();
+    } catch (error: any) {
+      toast(TOAST_MESSAGES.thought.updateError(error.message));
+      throw error;
+    }
+  };
+
+  const addCategoryToThought = async (
+    thoughtId: string,
+    categoryName: string
+  ) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data, error } = await (supabase as any).rpc('add_category_to_thought', {
+        p_thought_id: thoughtId,
+        p_category_name: categoryName,
+        p_user_id: user.id
+      });
+
+      if (error) throw error;
+      
+      toast(TOAST_MESSAGES.category.added);
+      await fetchThoughts();
+    } catch (error: any) {
+      toast(TOAST_MESSAGES.category.addError(error.message));
+      throw error;
+    }
+  };
+
   useEffect(() => {
     const initialize = async () => {
       setIsLoading(true);
@@ -165,6 +236,9 @@ export function useThoughts() {
     archiveThought,
     restoreThought,
     removeCategoryFromThought,
+    toggleThoughtCompletion,
+    updateThought,
+    addCategoryToThought,
     fetchArchivedThoughts
   };
 }

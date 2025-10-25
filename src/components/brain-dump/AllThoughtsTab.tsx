@@ -18,6 +18,9 @@ interface AllThoughtsTabProps {
   onBulkArchive: () => void;
   onArchive: (id: string) => void;
   onRemoveCategory: (thoughtId: string, categoryId: string) => void;
+  onMarkDone?: (id: string) => void;
+  onEdit?: (id: string) => void;
+  onAddCategory?: (thoughtId: string) => void;
 }
 
 export function AllThoughtsTab({
@@ -34,7 +37,10 @@ export function AllThoughtsTab({
   onToggleSelect,
   onBulkArchive,
   onArchive,
-  onRemoveCategory
+  onRemoveCategory,
+  onMarkDone,
+  onEdit,
+  onAddCategory
 }: AllThoughtsTabProps) {
   return (
     <>
@@ -65,6 +71,9 @@ export function AllThoughtsTab({
         onToggleSelect={onToggleSelect}
         onArchive={onArchive}
         onRemoveCategory={onRemoveCategory}
+        onMarkDone={onMarkDone}
+        onEdit={onEdit}
+        onAddCategory={onAddCategory}
       />
     </>
   );

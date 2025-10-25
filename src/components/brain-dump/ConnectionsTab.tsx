@@ -9,21 +9,29 @@ interface ConnectionsTabProps {
 }
 
 export function ConnectionsTab({ connections, isFinding, onFind }: ConnectionsTabProps) {
+  // Filter out connections where either thought is completed
+  const activeConnections = connections.filter(
+    conn => !conn.thought1.is_completed && !conn.thought2.is_completed
+  );
+
   return (
     <div className="space-y-4">
       <Button onClick={onFind} className="w-full" disabled={isFinding}>
         {isFinding ? 'Finding Connections...' : 'Find Surprising Connections'}
       </Button>
 
-      {connections.length === 0 ? (
+      {activeConnections.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-muted-foreground">
-            No connections found yet. Click above to discover hidden relationships.
+            {connections.length > 0 
+              ? 'All connections involve completed thoughts. Mark thoughts as active to see connections.'
+              : 'No connections found yet. Click above to discover hidden relationships.'
+            }
           </p>
         </div>
       ) : (
         <div className="space-y-4">
-          {connections.map((conn, idx) => (
+          {activeConnections.map((conn, idx) => (
             <Card key={idx} className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
