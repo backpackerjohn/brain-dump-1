@@ -14,12 +14,13 @@ import { useThoughts } from "@/hooks/useThoughts";
 import { useCategories } from "@/hooks/useCategories";
 import { useClusters } from "@/hooks/useClusters";
 import { useThoughtFilters } from "@/hooks/useThoughtFilters";
-import { Plus } from "lucide-react";
+import { Plus, Sparkles, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { validateThoughtContent } from "@/utils/validation";
 import { TOAST_MESSAGES } from "@/utils/toast-messages";
 import { ThoughtWithCategories } from "@/types/thought.types";
+import { AIStatusMessage } from "@/components/brain-dump/AIStatusMessage";
 
 const BrainDump = () => {
   const { toast } = useToast();
@@ -62,7 +63,8 @@ const BrainDump = () => {
     renameCluster,
     findRelatedThoughts,
     checkClusterCompletion,
-    archiveCluster
+    archiveCluster,
+    removeThoughtFromCluster
   } = useClusters(thoughts);
   
   const {
@@ -70,6 +72,8 @@ const BrainDump = () => {
     setSearchQuery,
     selectedCategories,
     toggleCategoryFilter,
+    sortBy,
+    setSortBy,
     filteredThoughts,
   } = useThoughtFilters(thoughts);
 
@@ -228,13 +232,29 @@ const BrainDump = () => {
               rows={4}
               className="mb-4"
             />
+            {isProcessing && (
+              <AIStatusMessage
+                message="AI is analyzing your thoughts"
+                detail="Extracting tasks, generating categories, and creating summaries..."
+              />
+            )}
             <Button
               onClick={() => handleProcessThought(thoughtContent)}
               disabled={isProcessing || !thoughtContent.trim()}
-              className="w-full"
+              className="w-full mt-4"
               size="lg"
             >
-              {isProcessing ? "Processing..." : "Process Thoughts"}
+              {isProcessing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Analyzing with AI...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Process Thoughts
+                </>
+              )}
             </Button>
           </Card>
 
@@ -260,6 +280,8 @@ const BrainDump = () => {
                 onMarkDone={handleMarkDone}
                 onEdit={handleEdit}
                 onAddCategory={handleAddCategory}
+                sortBy={sortBy}
+                onSortChange={setSortBy}
               />
             </TabsContent>
 
@@ -276,6 +298,7 @@ const BrainDump = () => {
                 isFindingRelated={isFindingRelated}
                 checkClusterCompletion={checkClusterCompletion}
                 onArchiveCluster={archiveCluster}
+                onRemoveFromCluster={removeThoughtFromCluster}
                 onMarkDone={handleMarkDone}
               />
             </TabsContent>

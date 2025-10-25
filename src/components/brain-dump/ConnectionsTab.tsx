@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Connection } from '@/types/thought.types';
+import { Sparkles, Loader2 } from 'lucide-react';
 
 interface ConnectionsTabProps {
   connections: Connection[];
@@ -16,8 +17,18 @@ export function ConnectionsTab({ connections, isFinding, onFind }: ConnectionsTa
 
   return (
     <div className="space-y-4">
-      <Button onClick={onFind} className="w-full" disabled={isFinding}>
-        {isFinding ? 'Finding Connections...' : 'Find Surprising Connections'}
+      <Button onClick={onFind} className="w-full" disabled={isFinding} size="lg">
+        {isFinding ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Finding Connections...
+          </>
+        ) : (
+          <>
+            <Sparkles className="mr-2 h-4 w-4" />
+            Find Surprising Connections
+          </>
+        )}
       </Button>
 
       {activeConnections.length === 0 ? (

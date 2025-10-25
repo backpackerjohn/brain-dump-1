@@ -29,6 +29,8 @@ interface ThoughtCardProps {
   onEdit?: (id: string) => void;
   onRemoveCategory?: (thoughtId: string, categoryId: string) => void;
   onAddCategory?: (thoughtId: string) => void;
+  onRemoveFromCluster?: () => void;
+  showRemoveFromCluster?: boolean;
 }
 
 export function ThoughtCard({
@@ -41,8 +43,11 @@ export function ThoughtCard({
   onEdit,
   onRemoveCategory,
   onAddCategory,
+  onRemoveFromCluster,
+  showRemoveFromCluster,
 }: ThoughtCardProps) {
   const [showDone, setShowDone] = useState(false);
+  const [showRemoveButton, setShowRemoveButton] = useState(false);
   const isCompleted = thought.is_completed || false;
 
   return (
@@ -51,8 +56,14 @@ export function ThoughtCard({
         "p-4 hover:shadow-md transition-all duration-300 group relative",
         isCompleted && "opacity-50 bg-muted/30"
       )}
-      onMouseEnter={() => setShowDone(true)}
-      onMouseLeave={() => setShowDone(false)}
+      onMouseEnter={() => {
+        setShowDone(true);
+        setShowRemoveButton(true);
+      }}
+      onMouseLeave={() => {
+        setShowDone(false);
+        setShowRemoveButton(false);
+      }}
     >
       {isSelectMode && (
         <div className="absolute top-4 left-4 z-10">
@@ -61,6 +72,17 @@ export function ThoughtCard({
             onCheckedChange={() => onToggleSelect?.(thought.id)}
           />
         </div>
+      )}
+
+      {showRemoveButton && showRemoveFromCluster && !isSelectMode && (
+        <Button
+          size="icon"
+          variant="ghost"
+          className="absolute top-2 left-2 z-10 transition-colors hover:bg-destructive/10"
+          onClick={onRemoveFromCluster}
+        >
+          <X className="h-4 w-4 text-destructive" />
+        </Button>
       )}
 
       {showDone && !isSelectMode && (

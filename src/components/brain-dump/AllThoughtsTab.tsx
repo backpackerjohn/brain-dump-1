@@ -2,6 +2,15 @@ import { Button } from '@/components/ui/button';
 import { FilterPanel } from './FilterPanel';
 import { ThoughtList } from './ThoughtList';
 import { Category, ThoughtWithCategories } from '@/types/thought.types';
+import { SortBy } from '@/hooks/useThoughtFilters';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { ArrowUpDown } from 'lucide-react';
 
 interface AllThoughtsTabProps {
   thoughts: ThoughtWithCategories[];
@@ -21,6 +30,8 @@ interface AllThoughtsTabProps {
   onMarkDone?: (id: string) => void;
   onEdit?: (id: string) => void;
   onAddCategory?: (thoughtId: string) => void;
+  sortBy: SortBy;
+  onSortChange: (sortBy: SortBy) => void;
 }
 
 export function AllThoughtsTab({
@@ -40,7 +51,9 @@ export function AllThoughtsTab({
   onRemoveCategory,
   onMarkDone,
   onEdit,
-  onAddCategory
+  onAddCategory,
+  sortBy,
+  onSortChange
 }: AllThoughtsTabProps) {
   return (
     <>
@@ -53,7 +66,28 @@ export function AllThoughtsTab({
         isSelectMode={isSelectMode}
         onToggleSelectMode={onToggleSelectMode}
         selectedCount={selectedThoughts.length}
+        thoughts={thoughts}
       />
+
+      {/* Sort and Count Header */}
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm text-muted-foreground">
+          {thoughts.length} thought{thoughts.length !== 1 ? 's' : ''}
+        </p>
+        
+        <Select value={sortBy} onValueChange={onSortChange}>
+          <SelectTrigger className="w-[180px]">
+            <ArrowUpDown className="mr-2 h-4 w-4" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="recent">Most Recent</SelectItem>
+            <SelectItem value="oldest">Oldest First</SelectItem>
+            <SelectItem value="title">Title (A-Z)</SelectItem>
+            <SelectItem value="categories">Most Categorized</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
       {isSelectMode && selectedThoughts.length > 0 && (
         <div className="flex gap-2 mb-4">

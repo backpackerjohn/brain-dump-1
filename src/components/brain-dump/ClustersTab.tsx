@@ -12,7 +12,8 @@ import {
   X, 
   Plus,
   Sparkles,
-  Search
+  Search,
+  Loader2
 } from 'lucide-react';
 import {
   Collapsible,
@@ -47,6 +48,7 @@ interface ClustersTabProps {
     isFullyCompleted: boolean;
   };
   onArchiveCluster: (clusterId: string) => void;
+  onRemoveFromCluster: (thoughtId: string, clusterId: string) => void;
   onMarkDone?: (id: string) => void;
 }
 
@@ -62,6 +64,7 @@ export function ClustersTab({
   isFindingRelated,
   checkClusterCompletion,
   onArchiveCluster,
+  onRemoveFromCluster,
   onMarkDone
 }: ClustersTabProps) {
   const [openClusters, setOpenClusters] = useState<Set<string>>(new Set());
@@ -113,8 +116,19 @@ export function ClustersTab({
     return cluster.thought_clusters?.length || 0;
   };
 
-  // Show empty state if user has < 10 unclustered thoughts and no clusters
-  if (unclusteredCount < 10 && clusters.length === 0) {
+  // Filter out empty AI-generated clusters (keep them in DB for reuse)
+  const visibleClusters = clusters.filter(cluster => {
+    const thoughtCount = cluster.thought_clusters?.length || 0;
+    
+    // Always show manual clusters (user created them intentionally)
+    if (cluster.is_manual) return true;
+    
+    // Hide AI-generated clusters with no thoughts
+    return thoughtCount > 0;
+  });
+
+  // Show empty state if user has < 10 unclustered thoughts and no visible clusters
+  if (unclusteredCount < 10 && visibleClusters.length === 0) {
     return (
       <div className="space-y-4">
         <Card className="p-12">
@@ -152,13 +166,13 @@ export function ClustersTab({
           >
             {isGenerating ? (
               <>
-                <Sparkles className="mr-2 h-4 w-4 animate-pulse" />
-                Analyzing your thoughts...
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                AI organizing...
               </>
             ) : (
               <>
                 <Sparkles className="mr-2 h-4 w-4" />
-                ✨ You have {unclusteredCount} unclustered thoughts. Let AI find the patterns.
+                Generate Clusters ({unclusteredCount} thoughts)
               </>
             )}
           </Button>
@@ -221,7 +235,7 @@ export function ClustersTab({
       )}
 
       {/* Clusters List */}
-      {clusters.length === 0 && !isGenerating ? (
+      {visibleClusters.length === 0 && !isGenerating ? (
         <Card className="p-12">
           <div className="text-center">
             <p className="text-muted-foreground">
@@ -233,7 +247,7 @@ export function ClustersTab({
         </Card>
       ) : (
         <div className="space-y-4">
-          {clusters.map((cluster) => {
+          {visibleClusters.map((cluster) => {
             const isOpen = openClusters.has(cluster.id);
             const thoughtCount = getThoughtCount(cluster);
             const isEditing = editingCluster === cluster.id;
@@ -369,6 +383,8 @@ export function ClustersTab({
                               thought={tc.thoughts}
                               onArchive={onArchive}
                               onMarkDone={onMarkDone}
+                              onRemoveFromCluster={() => onRemoveFromCluster(tc.thoughts.id, cluster.id)}
+                              showRemoveFromCluster={true}
                             />
                           ))}
                         </div>

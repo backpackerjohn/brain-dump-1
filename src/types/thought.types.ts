@@ -17,6 +17,7 @@ export interface Thought {
 export interface Category {
   id: string;
   name: string;
+  usage_count?: number;
 }
 
 export interface ThoughtCategory {
